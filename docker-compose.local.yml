@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: turnir-mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-aukus4}
+      MYSQL_USER: ${MYSQL_USER:-crystal_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-pass}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - turnir-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: turnir-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:-crystal_user}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - turnir-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: turnir-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER:-crystal_user}:${MYSQL_PASSWORD:-pass}@mysql:3306/${MYSQL_DATABASE:-aukus4}
+      IP: 0.0.0.0
+      PORT: ${APP_PORT:-8080}
+      CLIENT_RESTARTER_INTERVAL_SECONDS: ${CLIENT_RESTARTER_INTERVAL_SECONDS:-180}
+      CHANNELS_API_URL: ${CHANNELS_API_URL:-https://api.eventlab.dev/api/users?is_active=1&events=aukus4}
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-NO_CLIENT_ID}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-NO_CLIENT_SECRET}
+      KICK_CLIENT_ID: ${KICK_CLIENT_ID:-NO_CLIENT_ID}
+      KICK_CLIENT_SECRET: ${KICK_CLIENT_SECRET:-NO_CLIENT_SECRET}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - turnir-network
+    volumes:
+      - ./logs:/app/logs
+
+networks:
+  turnir-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+
+
+

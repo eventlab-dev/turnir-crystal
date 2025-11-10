@@ -5,7 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apk update && apk add --no-cache \
     sqlite-dev \
-    xz-dev
+    xz-dev \
+    bash \
+    openssl
 
 # Set the working directory
 WORKDIR /app

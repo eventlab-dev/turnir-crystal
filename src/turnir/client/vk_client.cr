@@ -29,6 +29,7 @@ module Turnir::Client::VkWebsocket
     app_config = get_vk_app_config()
     if app_config.nil?
       log "Failed to get vk token"
+      sync_channel.send(nil)  # Unblock the main thread
       return
     end
 
@@ -49,6 +50,7 @@ module Turnir::Client::VkWebsocket
     websocket = @@websocket
     if websocket.nil?
       log "Failed to create websocket"
+      sync_channel.send(nil)  # Unblock the main thread
       return
     end
 

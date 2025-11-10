@@ -10,6 +10,7 @@ module Turnir::Webserver
 
   URL_MAP = {
     /^\/external\/kick-hook$/ => ->kick_web_hook(HTTP::Server::Context),
+    /^\/test$/ => ->test_endpoint(HTTP::Server::Context),
   }
 
   class MethodNotSupported < Exception
@@ -60,10 +61,19 @@ module Turnir::Webserver
 
     signed_data = "#{message_id}.#{message_ts}.#{body}"
 
-    valid_signature = Utils.verify_kick_signature(
-      signed_data,
-      kick_signature,
-    )
+    valid_signature = false
+    begin
+      valid_signature = Utils.verify_kick_signature(
+        signed_data,
+        kick_signature,
+      )
+    rescue ex : Exception
+      log "Signature verification failed with exception: #{ex.inspect}"
+      context.response.status = HTTP::Status::INTERNAL_SERVER_ERROR
+      context.response.content_type = "text/plain"
+      context.response.print "signature verification error"
+      return
+    end
 
     if !valid_signature
       context.response.status = HTTP::Status::OK
@@ -80,6 +90,13 @@ module Turnir::Webserver
 
     context.response.content_type = "application/json"
     context.response.print ({"status" => "ok"}).to_json
+  end
+
+  def test_endpoint(context : HTTP::Server::Context)
+    log "Test endpoint called"
+    context.response.status = HTTP::Status::OK
+    context.response.content_type = "application/json"
+    context.response.print ({"status" => "ok", "message" => "test successful"}).to_json
   end
 
   def start

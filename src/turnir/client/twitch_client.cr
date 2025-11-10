@@ -43,6 +43,7 @@ module Turnir::Client::TwitchWebsocket
     websocket = @@websocket
     if websocket.nil?
       log "Failed to start websocket"
+      sync_channel.send(nil)  # Unblock the main thread
       return
     end
 

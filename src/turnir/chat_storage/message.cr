@@ -23,7 +23,7 @@ module Turnir::ChatStorage::Types
       @channel = channel
     end
 
-    def self.from_vk_message(message : Turnir::Parser::Vk::ChatMessage, text : String, mentions : Array(Turnir::Parser::Vk::ContentDataMention))
+    def self.from_vk_message(message : Turnir::Parser::Vk::ChatMessage, text : String, mentions : Array(Turnir::Parser::Vk::ContentDataMention), channel_owner : String? = nil)
       data = message.push.pub.data.data
       # created_at = data.createdAt
       created_at = Time.utc.to_unix_ms
@@ -43,7 +43,14 @@ module Turnir::ChatStorage::Types
 
       user = ChatUser.new(id: user_id.to_s, username: username, vk_fields: customFields)
       vk_fields = VkMessageFields.new(mentions)
-      new(id: message_id.to_s, ts: created_at, message: text, user: user, vk_fields: vk_fields, channel: message.push.channel)
+      
+      formatted_channel = if channel_owner
+                            "vkvideo/#{channel_owner}"
+                          else
+                            "vkvideo/#{message.push.channel}"
+                          end
+      
+      new(id: message_id.to_s, ts: created_at, message: text, user: user, vk_fields: vk_fields, channel: formatted_channel)
     end
 
     def self.from_goodgame_message(data : Turnir::Parser::Goodgame::MessageData)
@@ -53,9 +60,11 @@ module Turnir::ChatStorage::Types
       username = data.user_name
       user_id = data.user_id
       channel_id = data.channel_id
+      
+      formatted_channel = "goodgame/#{channel_id}"
 
       user = ChatUser.new(id: user_id.to_s, username: username)
-      new(id: message_id.to_s, ts: created_at, message: data.text, user: user, channel: channel_id)
+      new(id: message_id.to_s, ts: created_at, message: data.text, user: user, channel: formatted_channel)
     end
 
     def self.from_kick_message(message : Turnir::Parser::Kick::ChatMessage)
@@ -64,10 +73,12 @@ module Turnir::ChatStorage::Types
 
       username = message.sender.username
       user_id = message.sender.user_id
-      channel = message.broadcaster.channel_slug
+      channel_slug = message.broadcaster.channel_slug
+      
+      formatted_channel = "kick/#{channel_slug}"
 
       user = ChatUser.new(id: user_id.to_s, username: username)
-      new(id: message_id, ts: created_at, message: message.content, user: user, channel: channel)
+      new(id: message_id, ts: created_at, message: message.content, user: user, channel: formatted_channel)
     end
   end
 end

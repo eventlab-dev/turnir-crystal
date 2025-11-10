@@ -112,6 +112,14 @@ module Turnir::Client::VkWebsocket
     end
 
     begin
+      json_obj = JSON.parse(json_message)
+      if json_obj.as_h.has_key?("connect") || json_obj.as_h.has_key?("ping")
+        return nil
+      end
+    rescue ex
+    end
+
+    begin
       parsed = Turnir::Parser::Vk::ChatMessage.from_json(json_message)
     rescue ex
       log "Failed to parse message: #{ex.inspect}"
@@ -155,11 +163,14 @@ module Turnir::Client::VkWebsocket
     user_id = parsed.push.pub.data.data.author.id
     created_at = parsed.push.pub.data.data.createdAt
     message_id = parsed.push.pub.data.data.id
+    
+    channel_owner = @@reverse_channels_map.fetch(parsed.push.channel, nil)
 
     return Turnir::ChatStorage::Types::ChatMessage.from_vk_message(
       message: parsed,
       text: text,
       mentions: mentions,
+      channel_owner: channel_owner
     )
   end
 
@@ -180,7 +191,8 @@ module Turnir::Client::VkWebsocket
     end
 
     channel = "channel-chat:#{channel_id}"
-    @@channels_map[channel_name] = channel
+    formatted_channel = "vkvideo/#{channel_name}"
+    @@channels_map[channel_name] = formatted_channel
     @@reverse_channels_map[channel] = channel_name
     send_subscribe(channel)
   end

@@ -141,18 +141,25 @@ module Turnir::Client
 
       all_messages = [] of Turnir::ChatStorage::Types::ChatMessage
       STREAMS_STATUS_MAP_MUTEX.synchronize do
-        STREAMS_STATUS_MAP.each do |_, stream|
+        STREAMS_STATUS_MAP.each do |stream_name, stream|
           client = CLIENTS[stream.client_type]
           internal_channel = client.channels_map.fetch(stream.channel, nil)
+          # log "Checking stream #{stream_name}: internal_channel=#{internal_channel.inspect}"
           if internal_channel
             messages = client.storage.get_last_messages(internal_channel, 10)
+            # log "  Found #{messages.size} messages for #{stream_name}"
             all_messages.concat(messages)
+          else
+            # log "  No internal_channel mapping for #{stream.channel}"
           end
         end
       end
 
+      # log "Total messages collected: #{all_messages.size}"
+      
       if all_messages.any?
         random_message = all_messages.sample
+        # log "Saving random message from #{random_message.channel}: #{random_message.user.username}: #{random_message.message[0..50]}"
         begin
           Turnir::DbStorage.save_message(
             created_at: (random_message.ts / 1000).to_i32,
@@ -160,10 +167,14 @@ module Turnir::Client
             username: random_message.user.username,
             chat_name: random_message.channel
           )
+          # log "Message saved successfully to DB"
         rescue ex
           log "Failed to save random message to DB: #{ex}"
         end
         clear_all_storages
+        # log "Storage cleared"
+      else
+        # log "No messages to save"
       end
     end
   end

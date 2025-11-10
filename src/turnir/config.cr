@@ -1,12 +1,9 @@
 require "dotenv"
 
-Dotenv.load
+Dotenv.load?
 
 module Turnir::Config
   extend self
-
-  ROADHOUSE_CHAT = "channel-chat:6367818"
-  LASQA_CHAT     = "channel-chat:8845069"
 
   BUILD_TIME = {{ "#{`date`.strip}" }}
 
@@ -32,12 +29,14 @@ module Turnir::Config
 
   TWITCH_OAUTH_TOKEN = ENV.fetch("TWITCH_OAUTH", "NO_TOKEN")
   TWITCH_CLIENT_ID   = ENV.fetch("TWITCH_CLIENT_ID", "NO_CLIENT_ID")
-  TWITCH_NICK        = ENV.fetch("TWITCH_NICK", "turnir_bot")
 
   TWITCH_CLIENT_SECRET = ENV.fetch("TWITCH_CLIENT_SECRET", "NO_CLIENT_SECRET")
   @@twitch_access_token : String = ""
 
   KICK_OAUTH_TOKEN = ENV.fetch("KICK_OAUTH", "NO_TOKEN")
+  KICK_CLIENT_ID = ENV.fetch("KICK_CLIENT_ID", "NO_CLIENT_ID")
+  KICK_CLIENT_SECRET = ENV.fetch("KICK_CLIENT_SECRET", "NO_CLIENT_SECRET")
+  @@kick_access_token : String = ""
 
   def get_twitch_token
     @@twitch_access_token
@@ -45,5 +44,13 @@ module Turnir::Config
 
   def set_twitch_token(token : String)
     @@twitch_access_token = token
+  end
+
+  def get_kick_token
+    @@kick_access_token
+  end
+
+  def set_kick_token(token : String)
+    @@kick_access_token = token
   end
 end

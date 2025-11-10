@@ -47,13 +47,29 @@ module Turnir::Client::TwitchWebsocket
     end
 
     websocket.on_message do |msg|
+      # Отвечаем на PING от сервера
       if msg == "PING :tmi.twitch.tv"
         websocket.send("PONG :tmi.twitch.tv")
         next
       end
-      # log "WS message: #{msg}"
+      if msg.starts_with?("PONG") || msg.starts_with?(":tmi.twitch.tv PONG")
+        #log "Received PONG from server"
+        next
+      end
+      
+      #log "IRC RAW: #{msg}"
+      
+      if msg.includes?(":tmi.twitch.tv NOTICE * :Login authentication failed") || 
+         msg.includes?(":tmi.twitch.tv NOTICE * :Improperly formatted auth")
+        log "ERROR: Twitch authentication failed! Token may be invalid or not suitable for IRC."
+        log "Tip: Use User Access Token (with chat:read scope) instead of App Access Token"
+      end
+      
+      if msg.includes?(" 001 ")
+        log "Successfully connected to Twitch IRC!"
+      end
+      
       parsed = parse_message(msg)
-      # log "Parsed message: #{parsed.inspect}"
       if parsed
         storage.add_message(parsed)
       end
@@ -68,9 +84,31 @@ module Turnir::Client::TwitchWebsocket
     @@global_badges_map = fetch_badges()
     log "Global badges fetched: #{@@global_badges_map.size}"
 
-    websocket.send("PASS oauth:#{Turnir::Config.get_twitch_token}")
-    websocket.send("NICK #{Turnir::Config::TWITCH_NICK}")
-    websocket.send("CAP REQ :twitch.tv/tags")
+    nick = "justinfan#{rand(100000..999999)}"
+    log "Using anonymous IRC connection (read-only) with NICK: #{nick}"
+    websocket.send("PASS SCHMOOPIIE")
+    websocket.send("NICK #{nick}")
+    
+    log "Requesting IRC capabilities..."
+    websocket.send("CAP REQ :twitch.tv/tags twitch.tv/commands")
+    
+    spawn do
+      loop do
+        sleep 4.minutes
+        if websocket.closed?
+          log "Websocket closed, exiting keepalive..."
+          break
+        end
+        begin
+          websocket.send("PING :tmi.twitch.tv")
+          log "Sent keepalive PING"
+        rescue ex
+          log "Keepalive PING error: #{ex.inspect}"
+          break
+        end
+      end
+    end
+    
     sync_channel.send(nil)
     websocket.run
     @@websocket = nil
@@ -84,7 +122,8 @@ module Turnir::Client::TwitchWebsocket
     end
 
     internal_channel = "##{channel_name.downcase}"
-    @@channels_map[channel_name] = internal_channel
+    formatted_channel = "twitch/#{channel_name.downcase}"
+    @@channels_map[channel_name] = formatted_channel
     @@reverse_channels_map[internal_channel] = channel_name
 
     if @@channel_badges_map.fetch(internal_channel, nil).nil?
@@ -92,6 +131,7 @@ module Turnir::Client::TwitchWebsocket
       log "Channel #{channel_name} badges fetched: #{@@channel_badges_map[internal_channel].size}"
     end
 
+    log "Sending JOIN command for channel: #{channel_name}"
     websocket.send("JOIN ##{channel_name}")
   end
 
@@ -158,8 +198,11 @@ module Turnir::Client::TwitchWebsocket
     )
 
     # log "Parsed message: #{channel} #{user.username}: #{message}"
+    
+    channel_name = channel.starts_with?("#") ? channel[1..-1] : channel
+    formatted_channel = "twitch/#{channel_name}"
 
-    Turnir::ChatStorage::Types::ChatMessage.new(id: message_id.to_s, ts: ts, message: message, user: user, channel: channel)
+    Turnir::ChatStorage::Types::ChatMessage.new(id: message_id.to_s, ts: ts, message: message, user: user, channel: formatted_channel)
   end
 
   def parse_badges(channel_name : String, badges_str : String) : Turnir::Parser::Twitch::UserInfo

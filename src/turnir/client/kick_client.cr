@@ -18,10 +18,15 @@ module Turnir::Client::KickClient
   @@channel_to_broadcaster = {} of String => Int64
   @@broadcaster_to_channel = {} of Int64 => String
 
-  @@headers = HTTP::Headers{
-    "Authorization" => "Bearer #{Turnir::Config::KICK_OAUTH_TOKEN}",
-    "Content-Type"  => "application/json",
-  }
+  def get_headers
+    token = Turnir::Config.get_kick_token
+    token = Turnir::Config::KICK_OAUTH_TOKEN if token.empty?
+    
+    HTTP::Headers{
+      "Authorization" => "Bearer #{token}",
+      "Content-Type"  => "application/json",
+    }
+  end
 
   @@subscriptions = [] of Turnir::Parser::Kick::SubscriptionData
 
@@ -77,7 +82,8 @@ module Turnir::Client::KickClient
 
   def subscribe_to_channel(channel_name : String)
     log "Subscribing to channel: #{channel_name}"
-    @@channels_map[channel_name] = channel_name
+    formatted_channel = "kick/#{channel_name}"
+    @@channels_map[channel_name] = formatted_channel
 
     channel_id : Int64 | Nil = @@channel_to_broadcaster.fetch(channel_name, nil)
 
@@ -93,7 +99,7 @@ module Turnir::Client::KickClient
     end
 
     response = HTTP::Client.post("https://api.kick.com/public/v1/events/subscriptions",
-      headers: @@headers,
+      headers: get_headers,
       body: {
         "broadcaster_user_id": channel_id,
         "events":              [{
@@ -122,7 +128,7 @@ module Turnir::Client::KickClient
   def refresh_subscriptions
     response = HTTP::Client.get(
       "https://api.kick.com/public/v1/events/subscriptions",
-      headers: @@headers
+      headers: get_headers
     )
     begin
       parsed = Turnir::Parser::Kick::SubscriptionsResponse.from_json(response.body)
@@ -153,7 +159,7 @@ module Turnir::Client::KickClient
     begin
       response = HTTP::Client.delete(
         "https://api.kick.com/public/v1/events/subscriptions?#{qs}",
-        headers: @@headers
+        headers: get_headers
       )
       if response.status_code != 204
         log "Failed to unsubscribe from channel: #{response.status_code} #{response.body}"
@@ -164,7 +170,7 @@ module Turnir::Client::KickClient
   end
 
   def fetch_stream_info(channel_name : String)
-    response = HTTP::Client.get("https://api.kick.com/public/v1/channels?slug=#{channel_name}", headers: @@headers)
+    response = HTTP::Client.get("https://api.kick.com/public/v1/channels?slug=#{channel_name}", headers: get_headers)
     begin
       parsed = Turnir::Parser::Kick::ChannelsResponse.from_json(response.body)
       if parsed.data.size == 0

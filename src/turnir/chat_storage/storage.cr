@@ -17,6 +17,12 @@ module Turnir::ChatStorage
     end
 
     def add_message(msg : Turnir::ChatStorage::Types::ChatMessage)
+      # time = Time.unix_ms(msg.ts).to_s("%H:%M:%S")
+      # parts = msg.channel.split("/")
+      # platform = parts.size > 0 ? parts[0].upcase : "UNKNOWN"
+      # owner = parts.size > 1 ? parts[1] : "unknown"
+      # puts "[CHAT] [#{time}] [#{platform}:#{owner}] #{msg.user.username}: #{msg.message}"
+      
       @storage_mutex.synchronize do
         @storage << msg
         if @storage.size > MESSAGES_LIMIT

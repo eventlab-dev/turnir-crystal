@@ -1,6 +1,7 @@
 require "./turnir/webserver/endpoints"
 require "./turnir/client/client"
 require "./turnir/client/twitch_token_manager"
+require "./turnir/client/kick_token_manager"
 require "./turnir/db_storage"
 require "./turnir/config"
 require "http/client"
@@ -81,7 +82,7 @@ def fetch_initial_channels
   end
 end
 
-# Turnir::DbStorage.create_tables
+Turnir::DbStorage.create_tables
 
 channels_by_platform = Hash(Turnir::Client::ClientType, Array(String)).new
 
@@ -100,8 +101,15 @@ fetch_initial_channels.each do |channel_string|
   end
 end
 
+Turnir::Client::TwitchTokenManager.refresh_token(force: false)
+Turnir::Client::KickTokenManager.refresh_token(force: false)
+
 spawn do
   Turnir::Client::TwitchTokenManager.refresh_loop
+end
+
+spawn do
+  Turnir::Client::KickTokenManager.refresh_loop
 end
 
 channels_by_platform.each do |platform, channels|

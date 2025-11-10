@@ -154,7 +154,8 @@ module Turnir::Client::GoodgameWebsocket
 
     channel_id = channel_id.to_s
 
-    @@channels_map[channel_name] = channel_id
+    formatted_channel = "goodgame/#{channel_id}"
+    @@channels_map[channel_name] = formatted_channel
 
     join_msg = {
       type: "join",

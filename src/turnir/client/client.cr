@@ -135,7 +135,7 @@ module Turnir::Client
     end
   end
 
-  def log_random_message
+  def save_random_messages
     loop do
       sleep 1.minute
 
@@ -156,20 +156,22 @@ module Turnir::Client
       end
 
       # log "Total messages collected: #{all_messages.size}"
-      
+
       if all_messages.any?
-        random_message = all_messages.sample
+        random_messages = all_messages.sample(8)
         # log "Saving random message from #{random_message.channel}: #{random_message.user.username}: #{random_message.message[0..50]}"
-        begin
-          Turnir::DbStorage.save_message(
-            created_at: (random_message.ts / 1000).to_i32,
-            message: random_message.message,
-            username: random_message.user.username,
-            chat_name: random_message.channel
-          )
-          # log "Message saved successfully to DB"
-        rescue ex
-          log "Failed to save random message to DB: #{ex}"
+        random_messages.each do |msg|
+          begin
+            Turnir::DbStorage.save_message(
+              created_at: (msg.ts / 1000).to_i32,
+              message: msg.message,
+              username: msg.user.username,
+              chat_name: msg.channel
+            )
+            # log "Message saved successfully to DB"
+          rescue ex
+            log "Failed to save random message to DB: #{ex}"
+          end
         end
         clear_all_storages
         # log "Storage cleared"

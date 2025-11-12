@@ -126,7 +126,7 @@ spawn do
 end
 
 spawn do
-  Turnir::Client.log_random_message
+  Turnir::Client.save_random_messages
 end
 
 Turnir::Webserver.start

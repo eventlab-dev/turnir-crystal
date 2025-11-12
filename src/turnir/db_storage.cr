@@ -25,4 +25,11 @@ module Turnir::DbStorage
       created_at, message, username, chat_name
     )
   end
+
+  def delete_old_messages(older_than : Int32)
+    DB.exec(
+      "DELETE FROM chat_messages WHERE created_at < ?",
+      older_than
+    )
+  end
 end

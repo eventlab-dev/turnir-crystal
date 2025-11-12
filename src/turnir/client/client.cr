@@ -178,6 +178,9 @@ module Turnir::Client
       else
         # log "No messages to save"
       end
+
+      # delete messages 6 hours old
+      Turnir::DbStorage.delete_old_messages(Time.utc.to_unix.to_i32 - 6 * 3600)
     end
   end
 

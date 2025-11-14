@@ -7,6 +7,10 @@ module Turnir::Emotes
     SevenTV
     TwitchGlobal
     TwitchChannel
+    BTTVGlobal
+    BTTVChannel
+    FFZGlobal
+    FFZChannel
   end
 
   # Single emote data
@@ -51,10 +55,14 @@ module Turnir::Emotes
     result = Hash(String, Emote).new
     
     @@storage_lock.synchronize do
-      # Priority order: 7TV channel > 7TV global > Twitch channel > Twitch global
+      # Priority order: 7TV channel > 7TV global > BTTV channel > BTTV global > FFZ channel > FFZ global > Twitch channel > Twitch global
       providers = [
         {"7tv", user_slug},
         {"7tv", nil},
+        {"bttv", user_slug},
+        {"bttv", nil},
+        {"ffz", user_slug},
+        {"ffz", nil},
         {"twitch_channel", user_slug},
         {"twitch_channel", nil},
         {"twitch_global", nil},

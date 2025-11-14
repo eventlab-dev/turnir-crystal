@@ -3,6 +3,8 @@ require "json"
 require "./types"
 require "./seventv_client"
 require "./twitch_client"
+require "./bttv_client"
+require "./ffz_client"
 require "../config"
 
 module Turnir::Emotes
@@ -63,7 +65,7 @@ module Turnir::Emotes
       
       # Update global emotes
       if twitch_users.size > 0
-        puts "Updating global Twitch emotes (7TV + Twitch)"
+        puts "Updating global emotes (7TV + BTTV + FFZ + Twitch)"
         
         # Initialize clients
         puts "Initializing clients..."
@@ -72,6 +74,8 @@ module Turnir::Emotes
           client_id: Config::TWITCH_CLIENT_ID,
           access_token: Config.get_twitch_token
         )
+        bttv_client = BTTVClient.new
+        ffz_client = FFZClient.new
         puts "Clients initialized"
 
         # Update 7TV global emotes
@@ -80,6 +84,24 @@ module Turnir::Emotes
           stats["emotes_updated"] = stats["emotes_updated"] + count
         rescue ex
           puts "Error updating 7TV global emotes: #{ex}"
+          stats["errors"] = stats["errors"] + 1
+        end
+
+        # Update BTTV global emotes
+        begin
+          count = bttv_client.update_and_save_global_emotes
+          stats["emotes_updated"] = stats["emotes_updated"] + count
+        rescue ex
+          puts "Error updating BTTV global emotes: #{ex}"
+          stats["errors"] = stats["errors"] + 1
+        end
+
+        # Update FFZ global emotes
+        begin
+          count = ffz_client.update_and_save_global_emotes
+          stats["emotes_updated"] = stats["emotes_updated"] + count
+        rescue ex
+          puts "Error updating FFZ global emotes: #{ex}"
           stats["errors"] = stats["errors"] + 1
         end
 
@@ -108,6 +130,14 @@ module Turnir::Emotes
             
             # Update 7TV channel emotes
             count = seventv_client.update_and_save_channel_emotes(channel_id, user_slug)
+            stats["emotes_updated"] = stats["emotes_updated"] + count
+            
+            # Update BTTV channel emotes
+            count = bttv_client.update_and_save_channel_emotes(channel_id, user_slug)
+            stats["emotes_updated"] = stats["emotes_updated"] + count
+            
+            # Update FFZ channel emotes
+            count = ffz_client.update_and_save_channel_emotes(channel_id, user_slug)
             stats["emotes_updated"] = stats["emotes_updated"] + count
             
             # Update Twitch channel emotes

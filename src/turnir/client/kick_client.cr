@@ -65,7 +65,7 @@ module Turnir::Client::KickClient
       parsed = Turnir::Parser::Kick::ChatMessage.from_json(msg)
       if parsed
         # Process the parsed message
-        log "Parsed message: #{parsed}"
+        # log "Parsed message: #{parsed}"
         msg = Turnir::ChatStorage::Types::ChatMessage.from_kick_message(parsed)
         @@channels_map[msg.channel] = msg.channel
         @@storage.try { |s|

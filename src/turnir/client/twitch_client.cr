@@ -3,6 +3,7 @@ require "time"
 require "../chat_storage/types"
 require "../chat_storage/storage"
 require "../config"
+require "../emotes/parser"
 
 module Turnir::Client::TwitchWebsocket
   extend self
@@ -202,8 +203,16 @@ module Turnir::Client::TwitchWebsocket
     
     channel_name = channel.starts_with?("#") ? channel[1..-1] : channel
     formatted_channel = "twitch/#{channel_name}"
+    
+    # Get user_slug for this channel from channels_map
+    # channels_map contains "twitch/username" format, but emotes storage uses just "username"
+    user_slug_with_prefix = @@channels_map.fetch(channel_name, nil)
+    user_slug = user_slug_with_prefix ? user_slug_with_prefix.sub("twitch/", "") : nil
+    
+    # Parse emotes in the message
+    parsed_message = Turnir::Emotes::Parser.parse_twitch_message(message, user_slug)
 
-    Turnir::ChatStorage::Types::ChatMessage.new(id: message_id.to_s, ts: ts, message: message, user: user, channel: formatted_channel)
+    Turnir::ChatStorage::Types::ChatMessage.new(id: message_id.to_s, ts: ts, message: parsed_message, user: user, channel: formatted_channel)
   end
 
   def parse_badges(channel_name : String, badges_str : String) : Turnir::Parser::Twitch::UserInfo

@@ -4,6 +4,7 @@ require "./turnir/client/twitch_token_manager"
 require "./turnir/client/kick_token_manager"
 require "./turnir/db_storage"
 require "./turnir/config"
+require "./turnir/emotes/update"
 require "http/client"
 require "json"
 
@@ -20,6 +21,7 @@ struct User
   property vk_stream_link : String?
   property kick_stream_link : String?
   property twitch_stream_link : String?
+  property slug : String?
 end
 
 puts "Starting Turnir build: #{Turnir::Config::BUILD_TIME}"
@@ -127,6 +129,33 @@ end
 
 spawn do
   Turnir::Client.save_random_messages
+end
+
+spawn do
+  emote_update_interval = ENV.fetch("EMOTE_UPDATE_INTERVAL_SECONDS", "3600").to_i
+  puts "Starting emote updater loop TEST (interval: #{emote_update_interval}s)"
+  
+  # Run first update immediately on startup
+  begin
+    puts "Running initial emote update"
+    stats = Turnir::Emotes.update_all
+    puts "Initial emote update completed: #{stats}"
+  rescue ex
+    puts "Error in initial emote update: #{ex}"
+    puts ex.backtrace.join("\n")
+  end
+  
+  loop do
+    begin
+      sleep emote_update_interval.seconds
+      puts "Running periodic emote update"
+      stats = Turnir::Emotes.update_all
+      puts "Periodic emote update completed: #{stats}"
+    rescue ex
+      puts "Error in periodic emote update: #{ex}"
+      puts ex.backtrace.join("\n")
+    end
+  end
 end
 
 Turnir::Webserver.start

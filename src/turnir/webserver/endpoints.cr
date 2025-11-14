@@ -4,6 +4,7 @@ require "json"
 require "../client/client"
 require "../config"
 require "./utils"
+require "../emotes/update"
 
 module Turnir::Webserver
   extend self
@@ -11,6 +12,7 @@ module Turnir::Webserver
   URL_MAP = {
     /^\/external\/kick-hook$/ => ->kick_web_hook(HTTP::Server::Context),
     /^\/test$/ => ->test_endpoint(HTTP::Server::Context),
+    /^\/emotes\/update$/ => ->update_emotes_endpoint(HTTP::Server::Context),
   }
 
   class MethodNotSupported < Exception
@@ -97,6 +99,24 @@ module Turnir::Webserver
     context.response.status = HTTP::Status::OK
     context.response.content_type = "application/json"
     context.response.print ({"status" => "ok", "message" => "test successful"}).to_json
+  end
+
+  def update_emotes_endpoint(context : HTTP::Server::Context)
+    log "Emote update endpoint called"
+    
+    spawn do
+      begin
+        stats = Turnir::Emotes.update_all
+        log "Emote update completed with stats: #{stats}"
+      rescue ex
+        log "Error in emote update task: #{ex}"
+        log ex.backtrace.join("\n")
+      end
+    end
+
+    context.response.status = HTTP::Status::OK
+    context.response.content_type = "application/json"
+    context.response.print ({"status" => "ok", "message" => "Emote update started in background"}).to_json
   end
 
   def start

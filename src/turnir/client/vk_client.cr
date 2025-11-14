@@ -153,7 +153,7 @@ module Turnir::Client::VkWebsocket
           mentions << data
         end
         if data.is_a?(Turnir::Parser::Vk::ContentDataSmile) && data.type == "smile"
-          io << "[emote:#{data.largeUrl}:#{data.name}]"
+          io << "[emote|#{data.largeUrl}|#{data.name}]"
         end
       end
     end

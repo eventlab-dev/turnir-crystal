@@ -1,11 +1,11 @@
 require "./types"
 
 module Turnir::Emotes
-  # Emote parser for converting emote codes to [emote:URL:NAME] format in messages
+  # Emote parser for converting emote codes to [emote|URL|NAME] format in messages
   class Parser
 
-    # Parse message and replace emote codes with [emote:URL:NAME] format
-    # For Twitch: replaces emote codes like "Kappa" with "[emote:https://...:Kappa]"
+    # Parse message and replace emote codes with [emote|URL|NAME] format
+    # For Twitch: replaces emote codes like "Kappa" with "[emote|https://...|Kappa]"
     def self.parse_twitch_message(text : String, user_slug : String?) : String
       return text if text.empty?
 
@@ -41,7 +41,7 @@ module Turnir::Emotes
           pattern = /(?<!\w)#{escaped_code}(?!\w)/
         end
         
-        replacement = "[emote:#{emote.url}:#{code}]"
+        replacement = "[emote|#{emote.url}|#{code}]"
         
         # Check if pattern matches before replacement (for debug)
         matched = result.match(pattern)

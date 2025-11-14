@@ -28,7 +28,7 @@ module Turnir::Parser::Vk
     property id : Int32
     property createdAt : Int32
     property author : Author
-    property data : Array(ContentDataMention | ContentDataText | IgnoredData)
+    property data : Array(ContentDataMention | ContentDataText | ContentDataSmile | IgnoredData)
   end
 
   struct ContentDataText
@@ -42,6 +42,16 @@ module Turnir::Parser::Vk
     property type : String
     property id : Int32
     property displayName : String
+  end
+
+  struct ContentDataSmile
+    include JSON::Serializable
+    property type : String
+    property name : String
+    property id : String
+    property largeUrl : String
+    property mediumUrl : String
+    property smallUrl : String
   end
 
   struct IgnoredData

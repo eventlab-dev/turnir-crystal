@@ -152,6 +152,9 @@ module Turnir::Client::VkWebsocket
         if data.is_a?(Turnir::Parser::Vk::ContentDataMention) && data.type == "mention"
           mentions << data
         end
+        if data.is_a?(Turnir::Parser::Vk::ContentDataSmile) && data.type == "smile"
+          io << "[emote:#{data.largeUrl}:#{data.name}]"
+        end
       end
     end
 
@@ -228,7 +231,36 @@ module Turnir::Client::VkWebsocket
   end
 
   def get_vk_app_config
-    response = HTTP::Client.get "https://live.vkvideo.ru/"
+    headers = HTTP::Headers{
+      "User-Agent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+      "sec-ch-ua" => "\"Google Chrome\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"",
+      "sec-ch-ua-mobile" => "?0",
+      "sec-ch-ua-platform" => "\"Linux\""
+    }
+    
+    proxy_url = ENV["VK_PROXY_URL"]?
+    url = if proxy_url
+      log "Using proxy: #{proxy_url}"
+      "#{proxy_url}/https://live.vkvideo.ru/"
+    else
+      "https://live.vkvideo.ru/"
+    end
+    
+    response = HTTP::Client.get url, headers: headers
+    
+    # captcha
+    if response.status.redirection?
+      location = response.headers["Location"]?
+      log "Got redirect to: #{location}, but not following"
+      log "Redirect response body: #{response.body.inspect}"
+      return nil
+    end
+    
+    unless response.success?
+      log "Failed to get VK app config: HTTP error #{response.status} #{response.status_message}"
+      return nil
+    end
+    
     parsed = XML.parse_html(response.body)
     node = parsed.document.xpath_node("/html/body/script[@id='app-config']")
     node.try { |node| VkAppConfig.from_json node.content }

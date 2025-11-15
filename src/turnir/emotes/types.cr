@@ -55,7 +55,8 @@ module Turnir::Emotes
     result = Hash(String, Emote).new
     
     @@storage_lock.synchronize do
-      # Priority order: 7TV channel > 7TV global > BTTV channel > BTTV global > FFZ channel > FFZ global > Twitch channel > Twitch global
+      # Priority order: 7TV channel > 7TV global > BTTV channel > BTTV global > FFZ channel > FFZ global
+      # Note: Twitch emotes are now extracted from IRC messages, not loaded from API
       providers = [
         {"7tv", user_slug},
         {"7tv", nil},
@@ -63,9 +64,6 @@ module Turnir::Emotes
         {"bttv", nil},
         {"ffz", user_slug},
         {"ffz", nil},
-        {"twitch_channel", user_slug},
-        {"twitch_channel", nil},
-        {"twitch_global", nil},
       ]
 
       providers.each do |(provider, slug)|

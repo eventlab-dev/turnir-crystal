@@ -65,7 +65,7 @@ module Turnir::Emotes
       
       # Update global emotes
       if twitch_users.size > 0
-        puts "Updating global emotes (7TV + BTTV + FFZ + Twitch)"
+        puts "Updating global emotes (7TV + BTTV + FFZ)"
         
         # Initialize clients
         puts "Initializing clients..."
@@ -105,16 +105,8 @@ module Turnir::Emotes
           stats["errors"] = stats["errors"] + 1
         end
 
-        # Update Twitch global emotes
-        begin
-          count = twitch_client.update_and_save_global_emotes
-          stats["emotes_updated"] = stats["emotes_updated"] + count
-        rescue ex
-          puts "Error updating Twitch global emotes: #{ex}"
-          stats["errors"] = stats["errors"] + 1
-        end
-
-        # Resolve Twitch logins to IDs
+        # Note: Twitch emotes are now extracted from IRC messages, no need to load them
+        # Resolve Twitch logins to IDs (still needed for channel emotes from other providers)
         login_to_id = twitch_client.get_user_ids_batch(twitch_users.keys)
 
         # Update channel emotes
@@ -140,9 +132,7 @@ module Turnir::Emotes
             count = ffz_client.update_and_save_channel_emotes(channel_id, user_slug)
             stats["emotes_updated"] = stats["emotes_updated"] + count
             
-            # Update Twitch channel emotes
-            count = twitch_client.update_and_save_channel_emotes(channel_id, user_slug)
-            stats["emotes_updated"] = stats["emotes_updated"] + count
+            # Note: Twitch channel emotes are now extracted from IRC messages, no need to load them
             
             stats["channels_processed"] = stats["channels_processed"] + 1
           rescue ex

@@ -59,7 +59,7 @@ module Turnir::Client::TwitchWebsocket
         next
       end
       
-      #log "IRC RAW: #{msg}"
+      log "IRC RAW: #{msg}"
       
       if msg.includes?(":tmi.twitch.tv NOTICE * :Login authentication failed") || 
          msg.includes?(":tmi.twitch.tv NOTICE * :Improperly formatted auth")
@@ -166,23 +166,53 @@ module Turnir::Client::TwitchWebsocket
     message = nil
     channel = nil
 
-    if privmsg_index == 1
-      user_part = parts[0]
-      channel = parts[2].downcase
-      message = parts[3..-1].join(" ").strip
-    elsif privmsg_index == 2
-      badges_part = parts[0]
-      user_part = parts[1]
-      channel = parts[3].downcase
-      message = parts[4..-1].join(" ").strip
+    # Extract message preserving original spacing (important for emote position parsing)
+    # Find PRIVMSG and extract everything after the channel name
+    if privmsg_index
+      # Find the position of PRIVMSG in the original message
+      privmsg_pos = msg.index("PRIVMSG")
+      return nil unless privmsg_pos
+      
+      # Find the channel name after PRIVMSG
+      after_privmsg = msg[privmsg_pos + 7..-1]  # Skip "PRIVMSG"
+      after_privmsg = after_privmsg.lstrip
+      
+      # Find the channel (starts with #)
+      channel_start = after_privmsg.index("#")
+      return nil unless channel_start
+      
+      after_channel_start = after_privmsg[channel_start..-1]
+      # Find where channel name ends (space or end)
+      channel_end = after_channel_start.index(/\s+/)
+      if channel_end
+        channel_part = after_channel_start[0...channel_end]
+        message_part = after_channel_start[channel_end..-1].lstrip
+      else
+        channel_part = after_channel_start
+        message_part = ""
+      end
+      
+      channel = channel_part.downcase
+      
+      # Extract message (everything after channel, remove leading colon if present)
+      if message_part.size > 0 && message_part[0] == ':'
+        message = message_part[1..-1]
+      else
+        message = message_part
+      end
+      
+      # Extract user parts and badges
+      if privmsg_index == 1
+        user_part = parts[0]
+        badges_part = ""
+      elsif privmsg_index == 2
+        badges_part = parts[0]
+        user_part = parts[1]
+      end
     end
 
     if user_part.nil? || message.nil? || channel.nil?
       return nil
-    end
-
-    if message.size > 0 && message[0] == ':'
-      message = message[1..-1]
     end
 
     ts = Time.utc.to_unix_ms
@@ -209,10 +239,74 @@ module Turnir::Client::TwitchWebsocket
     user_slug_with_prefix = @@channels_map.fetch(channel_name, nil)
     user_slug = user_slug_with_prefix ? user_slug_with_prefix.sub("twitch/", "") : nil
     
-    # Parse emotes in the message
-    parsed_message = Turnir::Emotes::Parser.parse_twitch_message(message, user_slug)
+    # Extract Twitch emotes from IRC tags
+    irc_emotes = parse_irc_emotes(badges_part, message)
+    
+    # Parse emotes in the message (Twitch emotes from IRC + 7TV/BTTV/FFZ from memory)
+    parsed_message = Turnir::Emotes::Parser.parse_twitch_message(message, user_slug, irc_emotes)
 
     Turnir::ChatStorage::Types::ChatMessage.new(id: message_id.to_s, ts: ts, message: parsed_message, user: user, channel: formatted_channel)
+  end
+
+  def parse_irc_emotes(badges_str : String, message : String) : Hash(String, String)
+    irc_emotes = Hash(String, String).new
+    
+    return irc_emotes if badges_str.empty?
+    
+    # Extract emotes= field from IRC tags
+    # Format: emotes=emote_id:start-end/emote_id:start-end
+    parts = badges_str.split(";")
+    emotes_str = nil
+    
+    parts.each do |part|
+      if part.starts_with?("emotes=")
+        emotes_str = part.split("=")[1]
+        break
+      end
+    end
+    
+    return irc_emotes unless emotes_str && !emotes_str.empty?
+    
+    # Parse emote positions: emote_id:start-end/emote_id:start-end
+    # Multiple ranges for same emote_id are separated by commas: emote_id:start1-end1,start2-end2
+    emotes_str.split("/").each do |emote_data|
+      # Split emote_id and positions
+      colon_index = emote_data.index(":")
+      next unless colon_index
+      
+      emote_id = emote_data[0...colon_index]
+      positions_str = emote_data[colon_index + 1..-1]
+      
+      # Parse all position ranges for this emote (comma-separated)
+      positions_str.split(",").each do |position|
+        # Parse start-end
+        dash_index = position.index("-")
+        next unless dash_index
+        
+        start_pos = position[0...dash_index].to_i? || 0
+        end_pos = position[dash_index + 1..-1].to_i? || 0
+        next if start_pos < 0 || end_pos < start_pos
+        
+        # Extract emote text from message using byte positions
+        # Twitch IRC uses byte positions, not character positions
+        # Positions are inclusive (start-end means bytes from start to end, both inclusive)
+        message_bytes = message.to_slice
+        if start_pos >= 0 && end_pos >= start_pos && end_pos < message_bytes.size
+          emote_bytes = message_bytes[start_pos..end_pos]
+          emote_code = String.new(emote_bytes)
+          
+          # Store emote_id -> emote_code mapping (only first occurrence, or we could merge)
+          if !irc_emotes.has_key?(emote_id)
+            irc_emotes[emote_id] = emote_code
+            log "Parsed IRC emote: #{emote_id} -> '#{emote_code}' (positions #{start_pos}-#{end_pos})"
+          end
+        else
+          log "Warning: Invalid emote positions #{start_pos}-#{end_pos} for message size #{message_bytes.size}"
+        end
+      end
+    end
+    
+    irc_emotes
   end
 
   def parse_badges(channel_name : String, badges_str : String) : Turnir::Parser::Twitch::UserInfo

@@ -1,11 +1,15 @@
 require "./types"
 
 module Turnir::Emotes
-  # Emote parser for converting emote codes to [emote|URL|NAME] format in messages
+  # Emote parser for converting emote codes to [emote|URL|NAME] or [emote|URL|NAME|zw] format in messages
+  # For Twitch: replaces emote codes like "Kappa" with "[emote|https://...|Kappa]"
+  # For zero-width emotes: adds |zw flag "[emote|https://...|cvMask|zw]"
+  # irc_emotes: Hash mapping emote_id to emote_code (text) from IRC message
   class Parser
 
-    # Parse message and replace emote codes with [emote|URL|NAME] format
+    # Parse message and replace emote codes with [emote|URL|NAME|zw?] format
     # For Twitch: replaces emote codes like "Kappa" with "[emote|https://...|Kappa]"
+    # For zero-width (overlay) emotes: adds |zw flag
     # irc_emotes: Hash mapping emote_id to emote_code (text) from IRC message
     def self.parse_twitch_message(text : String, user_slug : String?, irc_emotes : Hash(String, String) = Hash(String, String).new) : String
       return text if text.empty?
@@ -57,7 +61,12 @@ module Turnir::Emotes
             pattern = /(?<!\w)#{escaped_code}(?!\w)/
           end
           
-          replacement = "[emote|#{emote.url}|#{code}]"
+          # Add |zw flag for zero-width (overlay) emotes
+          replacement = if emote.is_zero_width
+            "[emote|#{emote.url}|#{code}|zw]"
+          else
+            "[emote|#{emote.url}|#{code}]"
+          end
           
           # Perform replacement
           result = result.gsub(pattern, replacement)

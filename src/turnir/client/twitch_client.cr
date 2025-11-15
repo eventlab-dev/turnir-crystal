@@ -298,7 +298,7 @@ module Turnir::Client::TwitchWebsocket
           # Store emote_id -> emote_code mapping (only first occurrence, or we could merge)
           if !irc_emotes.has_key?(emote_id)
             irc_emotes[emote_id] = emote_code
-            log "Parsed IRC emote: #{emote_id} -> '#{emote_code}' (positions #{start_pos}-#{end_pos})"
+            #log "Parsed IRC emote: #{emote_id} -> '#{emote_code}' (positions #{start_pos}-#{end_pos})"
           end
         else
           log "Warning: Invalid emote positions #{start_pos}-#{end_pos} for message size #{message_bytes.size}"

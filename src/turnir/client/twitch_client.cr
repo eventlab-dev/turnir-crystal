@@ -59,7 +59,7 @@ module Turnir::Client::TwitchWebsocket
         next
       end
       
-      log "IRC RAW: #{msg}"
+      #log "IRC RAW: #{msg}"
       
       if msg.includes?(":tmi.twitch.tv NOTICE * :Login authentication failed") || 
          msg.includes?(":tmi.twitch.tv NOTICE * :Improperly formatted auth")

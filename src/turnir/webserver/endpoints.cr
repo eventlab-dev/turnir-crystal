@@ -166,12 +166,12 @@ module Turnir::Webserver
       end
       time_passed = Time.utc - start
 
-      if query
-        log "> #{method} #{path}?#{query} : #{response}"
-      else
-        log "> #{method} #{path} : #{response}"
-      end
-      log "< #{context.response.status} (#{time_passed.nanoseconds/100_000}ms)"
+      # if query
+      #   log "> #{method} #{path}?#{query} : #{response}"
+      # else
+      #   log "> #{method} #{path} : #{response}"
+      # end
+      # log "< #{context.response.status} (#{time_passed.nanoseconds/100_000}ms)"
     end
 
     log "Starting webserver"

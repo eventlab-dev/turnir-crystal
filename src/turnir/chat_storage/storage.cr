@@ -55,7 +55,7 @@ module Turnir::ChatStorage
         if last_message
           last_message.ts
         else
-          0
+          0_i64
         end
       end
     end

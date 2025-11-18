@@ -90,6 +90,52 @@ module Turnir::Client
     end
   end
 
+  def restart_client(client_type : ClientType)
+    log "Restarting client: #{client_type.to_s}"
+    client = CLIENTS[client_type]
+    
+    client_streams = STREAMS_STATUS_MAP.select { |k, v| k.downcase.starts_with?(client_type.to_s.downcase) }
+    channels = client_streams.values.map { |k| k.channel }
+    
+    client.mutex.synchronize do
+      old_fiber = client.fiber
+      
+      if old_fiber && !old_fiber.dead?
+        log "Stopping old fiber for #{client_type.to_s}"
+        begin
+          case client_type
+          when ClientType::TWITCH
+            Turnir::Client::TwitchWebsocket.stop
+          when ClientType::VKVIDEO
+            Turnir::Client::VkWebsocket.stop
+          when ClientType::GOODGAME
+            Turnir::Client::GoodgameWebsocket.stop
+          when ClientType::KICK
+            Turnir::Client::KickClient.stop
+          end
+        rescue ex
+          log "Error stopping client #{client_type.to_s}: #{ex.message}"
+        end
+      end
+      
+      disconnect_streams_for_client(client_type)
+      
+      client.ready_channel = Channel(Nil).new(0)
+      
+      log "Starting new fiber for #{client_type.to_s}"
+      client.fiber = spawn do
+        client.mod.start(client.ready_channel, client.storage, client.channels_map)
+      end
+      
+      client.ready_channel.receive
+      
+      channels.each do |channel|
+        log "Re-subscribing #{client_type.to_s} to channel: #{channel}"
+        client.mod.subscribe_to_channel(channel)
+      end
+    end
+  end
+
   def get_messages(client_type : ClientType, channel : String, since : Int64, text_filter : String)
     client = CLIENTS[client_type]
     ensure_client_running(client_type)
@@ -119,17 +165,34 @@ module Turnir::Client
       sleep 3.minutes
 
       active_client_types = Set(ClientType).new
+      client_stream_statuses = Hash(ClientType, {total: Int32, disconnected: Int32}).new
+      
       STREAMS_STATUS_MAP_MUTEX.synchronize do
         STREAMS_STATUS_MAP.each do |_, stream|
           active_client_types.add(stream.client_type)
+          
+          stats = client_stream_statuses.fetch(stream.client_type, {total: 0, disconnected: 0})
+          new_total = stats[:total] + 1
+          new_disconnected = stats[:disconnected] + (stream.status == ConnectionStatus::DISCONNECTED ? 1 : 0)
+          client_stream_statuses[stream.client_type] = {total: new_total, disconnected: new_disconnected}
         end
       end
 
       active_client_types.each do |client_type|
         client = CLIENTS[client_type]
-        if client.fiber.nil? || client.fiber.try(&.dead?)
+        is_fiber_dead = client.fiber.nil? || client.fiber.try(&.dead?)
+        
+        stats = client_stream_statuses.fetch(client_type, {total: 0, disconnected: 0})
+        all_streams_disconnected = stats[:total] > 0 && stats[:total] == stats[:disconnected]
+        
+        if is_fiber_dead
           log "Client for #{client_type} is dead, restarting."
           ensure_client_running(client_type)
+        elsif all_streams_disconnected
+          log "All streams for #{client_type} are disconnected (#{stats[:disconnected]}/#{stats[:total]}), restarting."
+          restart_client(client_type)
+        elsif stats[:disconnected] > 0
+          log "Client #{client_type} has #{stats[:disconnected]}/#{stats[:total]} disconnected streams, but some are still active."
         end
       end
     end
@@ -186,11 +249,18 @@ module Turnir::Client
 
   def stream_activity_checker
     loop do
-      STREAMS_STATUS_MAP.each do |_, stream|
+      STREAMS_STATUS_MAP.each do |stream_name, stream|
         client = CLIENTS[stream.client_type]
         last_message_ts = client.storage.get_last_message_ts(stream.channel)
-        if stream.status == ConnectionStatus::CONNECTED && last_message_ts > 0 && last_message_ts + 1.minutes < Time.utc.to_unix
-          stream.status = ConnectionStatus::DISCONNECTED
+        
+        if stream.status == ConnectionStatus::CONNECTED && last_message_ts > 0
+          inactivity_threshold = 5.minutes.total_seconds.to_i64
+          time_since_last_message = Time.utc.to_unix - last_message_ts
+          
+          if time_since_last_message > inactivity_threshold
+            log "Stream #{stream_name} is inactive for #{time_since_last_message}s, marking as disconnected"
+            stream.status = ConnectionStatus::DISCONNECTED
+          end
         end
       end
       sleep 60.seconds

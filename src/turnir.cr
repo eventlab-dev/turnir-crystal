@@ -124,7 +124,13 @@ end
 
 
 spawn do
+  puts "Starting client restarter"
   Turnir::Client.client_restarter
+end
+
+spawn do
+  puts "Starting stream activity checker"
+  Turnir::Client.stream_activity_checker
 end
 
 spawn do

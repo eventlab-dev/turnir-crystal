@@ -14,44 +14,58 @@ module Turnir::Emotes
     def self.parse_twitch_message(text : String, user_slug : String?, irc_emotes : Hash(String, String) = Hash(String, String).new) : String
       return text if text.empty?
 
-      result = text
-
-      # First, process Twitch emotes from IRC message (if provided)
-      # Format: { "emote_id" => "emote_code" }
-      if !irc_emotes.empty?
-        irc_emotes.each do |emote_id, emote_code|
-          emote_url = "https://static-cdn.jtvnw.net/emoticons/v2/#{emote_id}/default/dark/2.0"
-          escaped_code = Regex.escape(emote_code)
-          
-          pattern = /(^|\s)#{escaped_code}(?=\s|$)/
-          
-          replacement = "\\1[emote|#{emote_url}|#{emote_code}]"
-          result = result.gsub(pattern, replacement)
-        end
+      unless text.valid_encoding?
+        return text
       end
 
-      # Then, process 7TV/BTTV/FFZ emotes from memory (but skip Twitch emotes)
-      # Get emotes from memory (only 7TV/BTTV/FFZ, no Twitch)
-      emotes = Emotes.get_emotes("twitch", user_slug)
-      
-      if !emotes.empty?
-        # Sort by length (longest first) to avoid partial matches
-        sorted_codes = emotes.keys.sort_by { |k| -k.size }
+      result = text
 
-        sorted_codes.each do |code|
-          emote = emotes[code]
-          escaped_code = Regex.escape(code)
-          
-          pattern = /(^|\s)#{escaped_code}(?=\s|$)/
-          
-          replacement = if emote.is_zero_width
-            "\\1[emote|#{emote.url}|#{code}|zw]"
-          else
-            "\\1[emote|#{emote.url}|#{code}]"
+      begin
+        if !irc_emotes.empty?
+          irc_emotes.each do |emote_id, emote_code|
+            next unless emote_code.valid_encoding?
+            
+            emote_url = "https://static-cdn.jtvnw.net/emoticons/v2/#{emote_id}/default/dark/2.0"
+            
+            begin
+              escaped_code = Regex.escape(emote_code)
+              pattern = /(^|\s)#{escaped_code}(?=\s|$)/
+              replacement = "\\1[emote|#{emote_url}|#{emote_code}]"
+              result = result.gsub(pattern, replacement)
+            rescue ex
+              next
+            end
           end
-          
-          result = result.gsub(pattern, replacement)
         end
+
+        emotes = Emotes.get_emotes("twitch", user_slug)
+        
+        if !emotes.empty?
+          sorted_codes = emotes.keys.sort_by { |k| -k.size }
+
+          sorted_codes.each do |code|
+            next unless code.valid_encoding?
+            
+            emote = emotes[code]
+            
+            begin
+              escaped_code = Regex.escape(code)
+              pattern = /(^|\s)#{escaped_code}(?=\s|$)/
+              
+              replacement = if emote.is_zero_width
+                "\\1[emote|#{emote.url}|#{code}|zw]"
+              else
+                "\\1[emote|#{emote.url}|#{code}]"
+              end
+              
+              result = result.gsub(pattern, replacement)
+            rescue ex
+              next
+            end
+          end
+        end
+      rescue ex
+        return text
       end
 
       result

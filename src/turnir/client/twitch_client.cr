@@ -61,8 +61,6 @@ module Turnir::Client::TwitchWebsocket
         next
       end
       
-      #log "IRC RAW: #{msg}"
-      
       if msg.includes?(":tmi.twitch.tv NOTICE * :Login authentication failed") || 
          msg.includes?(":tmi.twitch.tv NOTICE * :Improperly formatted auth")
         log "ERROR: Twitch authentication failed! Token may be invalid or not suitable for IRC."
@@ -73,9 +71,13 @@ module Turnir::Client::TwitchWebsocket
         log "Successfully connected to Twitch IRC!"
       end
       
-      parsed = parse_message(msg)
-      if parsed
-        storage.add_message(parsed)
+      begin
+        parsed = parse_message(msg)
+        if parsed
+          storage.add_message(parsed)
+        end
+      rescue ex
+        log "Error parsing message: #{ex.inspect}"
       end
     end
 
@@ -285,25 +287,23 @@ module Turnir::Client::TwitchWebsocket
   def parse_irc_emotes(badges_str : String, message : String) : Hash(String, String)
     irc_emotes = Hash(String, String).new
     
-    return irc_emotes if badges_str.empty?
-    
-    # Extract emotes= field from IRC tags
-    # Format: emotes=emote_id:start-end/emote_id:start-end
-    parts = badges_str.split(";")
-    emotes_str = nil
-    
-    parts.each do |part|
-      if part.starts_with?("emotes=")
-        emotes_str = part.split("=")[1]
-        break
+    begin
+      return irc_emotes if badges_str.empty?
+      return irc_emotes unless message.valid_encoding?
+      
+      parts = badges_str.split(";")
+      emotes_str = nil
+      
+      parts.each do |part|
+        if part.starts_with?("emotes=")
+          emotes_str = part.split("=")[1]
+          break
+        end
       end
-    end
-    
-    return irc_emotes unless emotes_str && !emotes_str.empty?
-    
-    # Parse emote positions: emote_id:start-end/emote_id:start-end
-    # Multiple ranges for same emote_id are separated by commas: emote_id:start1-end1,start2-end2
-    emotes_str.split("/").each do |emote_data|
+      
+      return irc_emotes unless emotes_str && !emotes_str.empty?
+      
+      emotes_str.split("/").each do |emote_data|
       # Split emote_id and positions
       colon_index = emote_data.index(":")
       next unless colon_index
@@ -321,23 +321,30 @@ module Turnir::Client::TwitchWebsocket
         end_pos = position[dash_index + 1..-1].to_i? || 0
         next if start_pos < 0 || end_pos < start_pos
         
-        # Extract emote text from message using byte positions
-        # Twitch IRC uses byte positions, not character positions
-        # Positions are inclusive (start-end means bytes from start to end, both inclusive)
         message_bytes = message.to_slice
         if start_pos >= 0 && end_pos >= start_pos && end_pos < message_bytes.size
           emote_bytes = message_bytes[start_pos..end_pos]
-          emote_code = String.new(emote_bytes)
           
-          # Store emote_id -> emote_code mapping (only first occurrence, or we could merge)
-          if !irc_emotes.has_key?(emote_id)
-            irc_emotes[emote_id] = emote_code
-            #log "Parsed IRC emote: #{emote_id} -> '#{emote_code}' (positions #{start_pos}-#{end_pos})"
+          begin
+            emote_code = String.new(emote_bytes)
+            unless emote_code.valid_encoding?
+              next
+            end
+            
+            if !irc_emotes.has_key?(emote_id)
+              irc_emotes[emote_id] = emote_code
+            end
+          rescue ex
+            log "Warning: Failed to parse emote bytes at #{start_pos}-#{end_pos}: #{ex.inspect}"
+            next
           end
         else
           log "Warning: Invalid emote positions #{start_pos}-#{end_pos} for message size #{message_bytes.size}"
         end
       end
+    end
+    rescue ex
+      log "Error parsing IRC emotes: #{ex.inspect}"
     end
     
     irc_emotes

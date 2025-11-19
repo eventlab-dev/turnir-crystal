@@ -124,7 +124,7 @@ module Turnir::Webserver
   def status_endpoint(context : HTTP::Server::Context)
     log "Status endpoint called"
 
-    clients_status = {} of String => Hash(String, String | Bool)
+    clients_status = {} of String => Hash(String, String)
     websockets_status = {} of String => String
 
     Turnir::Client::CLIENTS.each do |client_type, client|

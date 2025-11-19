@@ -92,14 +92,28 @@ module Turnir::Client::GoodgameWebsocket
           websocket.send(PingMessage)
         rescue e
           log "Websocket ping error: #{e.inspect}"
+          log "Closing websocket due to keepalive failure"
+          begin
+            websocket.close
+          rescue close_ex
+            log "Error closing websocket: #{close_ex.inspect}"
+          end
           break
         end
       end
     end
 
     ready_channel.send(nil)
-    websocket.run
-    @@websocket = nil
+    
+    begin
+      websocket.run
+    rescue ex
+      log "Websocket run error: #{ex.inspect}"
+      log "Backtrace: #{ex.backtrace.join("\n")}"
+    ensure
+      @@websocket = nil
+      log "Goodgame websocket connection ended"
+    end
   end
 
   def stop

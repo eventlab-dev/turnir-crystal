@@ -49,13 +49,15 @@ module Turnir::Client::TwitchWebsocket
     end
 
     websocket.on_message do |msg|
-      # Отвечаем на PING от сервера
       if msg == "PING :tmi.twitch.tv"
-        websocket.send("PONG :tmi.twitch.tv")
+        begin
+          websocket.send("PONG :tmi.twitch.tv")
+        rescue ex
+          log "Error sending PONG response: #{ex.inspect}"
+        end
         next
       end
       if msg.starts_with?("PONG") || msg.starts_with?(":tmi.twitch.tv PONG")
-        #log "Received PONG from server"
         next
       end
       
@@ -88,11 +90,18 @@ module Turnir::Client::TwitchWebsocket
 
     nick = "justinfan#{rand(100000..999999)}"
     log "Using anonymous IRC connection (read-only) with NICK: #{nick}"
-    websocket.send("PASS SCHMOOPIIE")
-    websocket.send("NICK #{nick}")
     
-    log "Requesting IRC capabilities..."
-    websocket.send("CAP REQ :twitch.tv/tags twitch.tv/commands")
+    begin
+      websocket.send("PASS SCHMOOPIIE")
+      websocket.send("NICK #{nick}")
+      log "Requesting IRC capabilities..."
+      websocket.send("CAP REQ :twitch.tv/tags twitch.tv/commands")
+    rescue ex
+      log "Error during initial connection setup: #{ex.inspect}"
+      websocket.close rescue nil
+      sync_channel.send(nil)
+      return
+    end
     
     spawn do
       loop do
@@ -106,14 +115,28 @@ module Turnir::Client::TwitchWebsocket
           log "Sent keepalive PING"
         rescue ex
           log "Keepalive PING error: #{ex.inspect}"
+          log "Closing websocket due to keepalive failure"
+          begin
+            websocket.close
+          rescue close_ex
+            log "Error closing websocket: #{close_ex.inspect}"
+          end
           break
         end
       end
     end
     
     sync_channel.send(nil)
-    websocket.run
-    @@websocket = nil
+    
+    begin
+      websocket.run
+    rescue ex
+      log "Websocket run error: #{ex.inspect}"
+      log "Backtrace: #{ex.backtrace.join("\n")}"
+    ensure
+      @@websocket = nil
+      log "Twitch websocket connection ended"
+    end
   end
 
   def subscribe_to_channel(channel_name : String)

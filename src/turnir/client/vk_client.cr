@@ -57,7 +57,11 @@ module Turnir::Client::VkWebsocket
     websocket.on_message do |msg|
       # log "WS message: #{msg}"
       if msg == "{}"
-        websocket.send("{}")
+        begin
+          websocket.send("{}")
+        rescue ex
+          log "Error sending ping response: #{ex.inspect}"
+        end
         next
       end
       parsed = parse_message(msg)
@@ -76,8 +80,16 @@ module Turnir::Client::VkWebsocket
     send_login(app_config.websocket.token)
 
     sync_channel.send(nil)
-    websocket.run
-    @@websocket = nil
+    
+    begin
+      websocket.run
+    rescue ex
+      log "Websocket run error: #{ex.inspect}"
+      log "Backtrace: #{ex.backtrace.join("\n")}"
+    ensure
+      @@websocket = nil
+      log "VK websocket connection ended"
+    end
   end
 
   def stop

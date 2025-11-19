@@ -20,18 +20,12 @@ module Turnir::Emotes
       # Format: { "emote_id" => "emote_code" }
       if !irc_emotes.empty?
         irc_emotes.each do |emote_id, emote_code|
-          # Build URL for Twitch emote
           emote_url = "https://static-cdn.jtvnw.net/emoticons/v2/#{emote_id}/default/dark/2.0"
           escaped_code = Regex.escape(emote_code)
           
-          # Build pattern based on whether code contains special characters
-          if emote_code.match(/^\w+$/)
-            pattern = /\b#{escaped_code}\b/
-          else
-            pattern = /(?<!\w)#{escaped_code}(?!\w)/
-          end
+          pattern = /(^|\s)#{escaped_code}(?=\s|$)/
           
-          replacement = "[emote|#{emote_url}|#{emote_code}]"
+          replacement = "\\1[emote|#{emote_url}|#{emote_code}]"
           result = result.gsub(pattern, replacement)
         end
       end
@@ -48,27 +42,14 @@ module Turnir::Emotes
           emote = emotes[code]
           escaped_code = Regex.escape(code)
           
-          # Build pattern based on whether code contains special characters
-          # For codes with only word characters: use word boundaries \bCODE\b
-          # For codes with special chars: match standalone (not part of word)
-          if code.match(/^\w+$/)
-            # Simple word-only code: use word boundaries
-            pattern = /\b#{escaped_code}\b/
-          else
-            # Code with special characters: match standalone
-            # Use negative lookbehind/lookahead to ensure not part of word
-            # This works for codes like "(7TV)" - matches when not surrounded by word chars
-            pattern = /(?<!\w)#{escaped_code}(?!\w)/
-          end
+          pattern = /(^|\s)#{escaped_code}(?=\s|$)/
           
-          # Add |zw flag for zero-width (overlay) emotes
           replacement = if emote.is_zero_width
-            "[emote|#{emote.url}|#{code}|zw]"
+            "\\1[emote|#{emote.url}|#{code}|zw]"
           else
-            "[emote|#{emote.url}|#{code}]"
+            "\\1[emote|#{emote.url}|#{code}]"
           end
           
-          # Perform replacement
           result = result.gsub(pattern, replacement)
         end
       end
@@ -77,4 +58,5 @@ module Turnir::Emotes
     end
   end
 end
+
 

@@ -80,6 +80,21 @@ module Turnir::Client::VkWebsocket
     @@websocket = nil
   end
 
+  def stop
+    @@websocket.try { |ws| ws.close }
+  end
+
+  def get_websocket_status : String
+    ws = @@websocket
+    if ws.nil?
+      return "not_connected"
+    end
+    if ws.closed?
+      return "closed"
+    end
+    "connected"
+  end
+
   def parse_message(json_message)
     begin
       parsed = Turnir::Parser::Vk::ErrorMessage.from_json(json_message)

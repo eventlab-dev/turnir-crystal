@@ -125,6 +125,16 @@ module Turnir::Client::KickClient
     @@stop.set(1)
   end
 
+  def get_websocket_status : String
+    if @@stop.get == 1
+      return "stopped"
+    end
+    if @@subscriptions.empty?
+      return "not_connected"
+    end
+    "connected"
+  end
+
   def refresh_subscriptions
     response = HTTP::Client.get(
       "https://api.kick.com/public/v1/events/subscriptions",

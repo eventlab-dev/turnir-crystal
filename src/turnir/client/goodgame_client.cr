@@ -106,6 +106,17 @@ module Turnir::Client::GoodgameWebsocket
     @@websocket.try &.close()
   end
 
+  def get_websocket_status : String
+    ws = @@websocket
+    if ws.nil?
+      return "not_connected"
+    end
+    if ws.closed?
+      return "closed"
+    end
+    "connected"
+  end
+
   def parse_message(msg : String) : Turnir::ChatStorage::Types::ChatMessage | Nil
     if msg == PongMessage
       return nil

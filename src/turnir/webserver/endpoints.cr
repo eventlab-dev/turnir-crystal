@@ -13,6 +13,8 @@ module Turnir::Webserver
     /^\/external\/kick-hook$/ => ->kick_web_hook(HTTP::Server::Context),
     /^\/test$/ => ->test_endpoint(HTTP::Server::Context),
     /^\/emotes\/update$/ => ->update_emotes_endpoint(HTTP::Server::Context),
+    /^\/status$/ => ->status_endpoint(HTTP::Server::Context),
+    /^\/reload$/ => ->reload_endpoint(HTTP::Server::Context),
   }
 
   class MethodNotSupported < Exception
@@ -117,6 +119,89 @@ module Turnir::Webserver
     context.response.status = HTTP::Status::OK
     context.response.content_type = "application/json"
     context.response.print ({"status" => "ok", "message" => "Emote update started in background"}).to_json
+  end
+
+  def status_endpoint(context : HTTP::Server::Context)
+    log "Status endpoint called"
+
+    clients_status = {} of String => Hash(String, String | Bool)
+    websockets_status = {} of String => String
+
+    Turnir::Client::CLIENTS.each do |client_type, client|
+      fiber_status = if client.fiber.nil?
+        "not_started"
+      elsif client.fiber.try(&.dead?)
+        "dead"
+      else
+        "alive"
+      end
+
+      clients_status[client_type.to_s.downcase] = {
+        "fiber_status" => fiber_status,
+        "channels_count" => client.channels_map.size.to_s,
+      }
+
+      case client_type
+      when Turnir::Client::ClientType::TWITCH
+        ws = Turnir::Client::TwitchWebsocket.get_websocket_status
+        websockets_status["twitch"] = ws
+      when Turnir::Client::ClientType::VKVIDEO
+        ws = Turnir::Client::VkWebsocket.get_websocket_status
+        websockets_status["vkvideo"] = ws
+      when Turnir::Client::ClientType::GOODGAME
+        ws = Turnir::Client::GoodgameWebsocket.get_websocket_status
+        websockets_status["goodgame"] = ws
+      when Turnir::Client::ClientType::KICK
+        ws = Turnir::Client::KickClient.get_websocket_status
+        websockets_status["kick"] = ws
+      end
+    end
+
+    streams_status = {} of String => String
+    Turnir::Client::STREAMS_STATUS_MAP_MUTEX.synchronize do
+      Turnir::Client::STREAMS_STATUS_MAP.each do |stream_name, stream|
+        streams_status[stream_name] = stream.status.to_s.downcase
+      end
+    end
+
+    response_data = {
+      "clients" => clients_status,
+      "websockets" => websockets_status,
+      "streams" => streams_status,
+    }
+
+    context.response.status = HTTP::Status::OK
+    context.response.content_type = "application/json"
+    context.response.print response_data.to_json
+  end
+
+  def reload_endpoint(context : HTTP::Server::Context)
+    log "Reload endpoint called"
+
+    spawn do
+      begin
+        Turnir::Client::CLIENTS.each do |client_type, client|
+          client_streams = Turnir::Client::STREAMS_STATUS_MAP.select do |_, stream|
+            stream.client_type == client_type
+          end
+
+          if client_streams.any?
+            log "Restarting client: #{client_type}"
+            Turnir::Client.restart_client(client_type)
+          else
+            log "Skipping restart for #{client_type} - no active streams"
+          end
+        end
+        log "All clients reload completed"
+      rescue ex
+        log "Error in reload task: #{ex}"
+        log ex.backtrace.join("\n")
+      end
+    end
+
+    context.response.status = HTTP::Status::OK
+    context.response.content_type = "application/json"
+    context.response.print ({"status" => "ok", "message" => "Reload started in background"}).to_json
   end
 
   def start

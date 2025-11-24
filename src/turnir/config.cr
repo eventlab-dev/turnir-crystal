@@ -8,7 +8,7 @@ module Turnir::Config
   BUILD_TIME = {{ "#{`date`.strip}" }}
 
   def database_url
-    ENV.fetch("DATABASE_URL", "mysql://crystal_user:pass@127.0.0.1/aukus4")
+    ENV.fetch("DATABASE_URL", "mysql://crystal_user:pass@127.0.0.1/aukus4?charset=utf8mb4")
   end
 
   def webserver_ip

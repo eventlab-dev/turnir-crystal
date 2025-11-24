@@ -15,8 +15,9 @@ module Turnir::DbStorage
       "message TEXT NOT NULL," \
       "username VARCHAR(255) NOT NULL," \
       "chat_name VARCHAR(255) NOT NULL" \
-      ")"
+      ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     )
+    
   end
 
   def save_message(created_at : Int32, message : String, username : String, chat_name : String)

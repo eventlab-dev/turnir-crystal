@@ -269,6 +269,16 @@ module Turnir::Client::TwitchWebsocket
     
     parsed_message = Turnir::Emotes::Parser.parse_twitch_message(message, user_slug, irc_emotes)
 
+    if parsed_message.includes?("@badge-info=") || parsed_message.includes?("PRIVMSG")
+      log "ERROR: parse_message produced raw IRC in parsed_message!"
+      log "  Channel: #{channel}"
+      log "  User: #{user_name}"
+      log "  Original msg length: #{msg.size}"
+      log "  Parsed message: #{parsed_message[0..200]}"
+      log "  Original message var: #{original_message}"
+      log "  PRIVMSG index: #{privmsg_index}"
+    end
+
     Turnir::ChatStorage::Types::ChatMessage.new(id: message_id.to_s, ts: ts, message: parsed_message, user: user, channel: formatted_channel)
   end
 

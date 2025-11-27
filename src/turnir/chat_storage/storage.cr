@@ -17,11 +17,12 @@ module Turnir::ChatStorage
     end
 
     def add_message(msg : Turnir::ChatStorage::Types::ChatMessage)
-      # time = Time.unix_ms(msg.ts).to_s("%H:%M:%S")
-      # parts = msg.channel.split("/")
-      # platform = parts.size > 0 ? parts[0].upcase : "UNKNOWN"
-      # owner = parts.size > 1 ? parts[1] : "unknown"
-      # puts "[CHAT] [#{time}] [#{platform}:#{owner}] #{msg.user.username}: #{msg.message}"
+      if msg.message.includes?("@badge-info=") || msg.message.includes?("PRIVMSG")
+        puts "[STORAGE ERROR] Raw IRC detected when adding to storage!"
+        puts "  Channel: #{msg.channel}"
+        puts "  Username: #{msg.user.username}"
+        puts "  Message: #{msg.message[0..200]}"
+      end
       
       @storage_mutex.synchronize do
         @storage << msg

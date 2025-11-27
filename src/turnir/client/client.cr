@@ -225,13 +225,20 @@ module Turnir::Client
         # log "Saving random message from #{random_message.channel}: #{random_message.user.username}: #{random_message.message[0..50]}"
         random_messages.each do |msg|
           begin
+            if msg.message.includes?("@badge-info=") || msg.message.includes?("PRIVMSG")
+              log "WARNING: Raw IRC message detected in storage!"
+              log "  Channel: #{msg.channel}"
+              log "  Username: #{msg.user.username}"
+              log "  Message preview: #{msg.message[0..200]}"
+              log "  Full message length: #{msg.message.size}"
+            end
+            
             Turnir::DbStorage.save_message(
               created_at: (msg.ts / 1000).to_i32,
               message: msg.message,
               username: msg.user.username,
               chat_name: msg.channel
             )
-            # log "Message saved successfully to DB"
           rescue ex
             log "Failed to save random message to DB: #{ex}"
           end

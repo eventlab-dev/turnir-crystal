@@ -10,7 +10,7 @@ module Turnir::ChatStorage
 
     MESSAGES_LIMIT = 5000
 
-    def initialize()
+    def initialize
       @storage = [] of Turnir::ChatStorage::Types::ChatMessage
       @storage_mutex = Mutex.new
       @last_access = Time.utc
@@ -23,7 +23,7 @@ module Turnir::ChatStorage
         puts "  Username: #{msg.user.username}"
         puts "  Message: #{msg.message[0..200]}"
       end
-      
+
       @storage_mutex.synchronize do
         @storage << msg
         if @storage.size > MESSAGES_LIMIT

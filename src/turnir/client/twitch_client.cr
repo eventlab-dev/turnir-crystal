@@ -49,35 +49,39 @@ module Turnir::Client::TwitchWebsocket
     end
 
     websocket.on_message do |msg|
-      if msg == "PING :tmi.twitch.tv"
+      msg.split(/\r?\n/).each do |line|
+        next if line.empty?
+        
+        if line == "PING :tmi.twitch.tv"
+          begin
+            websocket.send("PONG :tmi.twitch.tv")
+          rescue ex
+            log "Error sending PONG response: #{ex.inspect}"
+          end
+          next
+        end
+        if line.starts_with?("PONG") || line.starts_with?(":tmi.twitch.tv PONG")
+          next
+        end
+        
+        if line.includes?(":tmi.twitch.tv NOTICE * :Login authentication failed") || 
+           line.includes?(":tmi.twitch.tv NOTICE * :Improperly formatted auth")
+          log "ERROR: Twitch authentication failed! Token may be invalid or not suitable for IRC."
+          log "Tip: Use User Access Token (with chat:read scope) instead of App Access Token"
+        end
+        
+        if line.includes?(" 001 ")
+          log "Successfully connected to Twitch IRC!"
+        end
+        
         begin
-          websocket.send("PONG :tmi.twitch.tv")
+          parsed = parse_message(line)
+          if parsed
+            storage.add_message(parsed)
+          end
         rescue ex
-          log "Error sending PONG response: #{ex.inspect}"
+          log "Error parsing message: #{ex.inspect}"
         end
-        next
-      end
-      if msg.starts_with?("PONG") || msg.starts_with?(":tmi.twitch.tv PONG")
-        next
-      end
-      
-      if msg.includes?(":tmi.twitch.tv NOTICE * :Login authentication failed") || 
-         msg.includes?(":tmi.twitch.tv NOTICE * :Improperly formatted auth")
-        log "ERROR: Twitch authentication failed! Token may be invalid or not suitable for IRC."
-        log "Tip: Use User Access Token (with chat:read scope) instead of App Access Token"
-      end
-      
-      if msg.includes?(" 001 ")
-        log "Successfully connected to Twitch IRC!"
-      end
-      
-      begin
-        parsed = parse_message(msg)
-        if parsed
-          storage.add_message(parsed)
-        end
-      rescue ex
-        log "Error parsing message: #{ex.inspect}"
       end
     end
 
